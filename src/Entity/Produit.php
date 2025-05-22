@@ -6,15 +6,26 @@ use App\Repository\ProduitRepository;
 use Doctrine\ORM\Mapping as ORM;
 use Symfony\Component\Serializer\Annotation\Groups;
 use Symfony\Component\Validator\Constraints as Assert;
+use OpenApi\Attributes as OA;
 
 #[ORM\Entity(repositoryClass: ProduitRepository::class)]
 #[ORM\HasLifecycleCallbacks]
+#[OA\Schema(
+    description: 'Entité représentant un produit dans le catalogue',
+    type: 'object',
+    title: 'Produit'
+)]
 class Produit
 {
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column]
     #[Groups(["produit:read"])]
+    #[OA\Property(
+        description: 'Identifiant unique du produit',
+        type: 'integer',
+        example: 1
+    )]
     private ?int $id = null;
 
     #[ORM\Column(length: 255)]
@@ -27,6 +38,13 @@ class Produit
         maxMessage: "Le nom ne peut pas dépasser {{ limit }} caractères"
     )]
     #[Assert\Type(type: "string", message: "Le nom doit être une chaîne de caractères")]
+    #[OA\Property(
+        description: 'Nom du produit',
+        type: 'string',
+        minLength: 2,
+        maxLength: 255,
+        example: 'T-shirt Nike Dri-FIT'
+    )]
     private ?string $nom = null;
 
     #[ORM\Column(type: "text", nullable: true)]
@@ -36,6 +54,13 @@ class Produit
         maxMessage: "La description ne peut pas dépasser {{ limit }} caractères"
     )]
     #[Assert\Type(type: "string", message: "La description doit être une chaîne de caractères")]
+    #[OA\Property(
+        description: 'Description détaillée du produit',
+        type: 'string',
+        maxLength: 2000,
+        nullable: true,
+        example: 'T-shirt de sport respirant pour homme, parfait pour les activités sportives'
+    )]
     private ?string $description = null;
 
     #[ORM\Column]
@@ -47,6 +72,14 @@ class Produit
         message: "Le prix ne peut pas dépasser {{ compared_value }} €"
     )]
     #[Assert\Type(type: "numeric", message: "Le prix doit être un nombre")]
+    #[OA\Property(
+        description: 'Prix du produit en euros',
+        type: 'number',
+        format: 'float',
+        minimum: 0.01,
+        maximum: 999999.99,
+        example: 29.99
+    )]
     private ?float $prix = null;
 
     #[ORM\Column(length: 255, nullable: true)]
@@ -55,6 +88,14 @@ class Produit
     #[Assert\Length(
         max: 255,
         maxMessage: "L'URL de l'image ne peut pas dépasser {{ limit }} caractères"
+    )]
+    #[OA\Property(
+        description: 'URL de l\'image principale du produit',
+        type: 'string',
+        format: 'url',
+        maxLength: 255,
+        nullable: true,
+        example: 'https://example.com/images/tshirt-nike.jpg'
     )]
     private ?string $image = null;
 
@@ -65,6 +106,12 @@ class Produit
         choices: ['vetements', 'chaussures', 'accessoires', 'sport', 'electronique', 'maison', 'beaute', 'autres'],
         message: "La catégorie doit être l'une des suivantes : {{ choices }}"
     )]
+    #[OA\Property(
+        description: 'Catégorie du produit',
+        type: 'string',
+        enum: ['vetements', 'chaussures', 'accessoires', 'sport', 'electronique', 'maison', 'beaute', 'autres'],
+        example: 'vetements'
+    )]
     private ?string $categorie = null;
 
     #[ORM\Column(length: 10, nullable: true)]
@@ -72,6 +119,13 @@ class Produit
     #[Assert\Choice(
         choices: ['XS', 'S', 'M', 'L', 'XL', 'XXL', '36', '37', '38', '39', '40', '41', '42', '43', '44', '45', '46'],
         message: "La taille doit être une taille valide (XS, S, M, L, XL, XXL ou pointure 36-46)"
+    )]
+    #[OA\Property(
+        description: 'Taille du produit (vêtements: XS-XXL, chaussures: 36-46)',
+        type: 'string',
+        enum: ['XS', 'S', 'M', 'L', 'XL', 'XXL', '36', '37', '38', '39', '40', '41', '42', '43', '44', '45', '46'],
+        nullable: true,
+        example: 'M'
     )]
     private ?string $taille = null;
 
@@ -85,6 +139,14 @@ class Produit
         pattern: '/^[a-zA-ZÀ-ÿ\s\-]+$/',
         message: "La couleur ne peut contenir que des lettres, espaces et tirets"
     )]
+    #[OA\Property(
+        description: 'Couleur principale du produit',
+        type: 'string',
+        maxLength: 50,
+        pattern: '^[a-zA-ZÀ-ÿ\s\-]+',
+        nullable: true,
+        example: 'bleu marine'
+    )]
     private ?string $couleur = null;
 
     #[ORM\Column(length: 20, nullable: true)]
@@ -93,14 +155,33 @@ class Produit
         choices: ['homme', 'femme', 'enfant', 'unisexe'],
         message: "Le sexe doit être : homme, femme, enfant ou unisexe"
     )]
+    #[OA\Property(
+        description: 'Public cible du produit',
+        type: 'string',
+        enum: ['homme', 'femme', 'enfant', 'unisexe'],
+        nullable: true,
+        example: 'homme'
+    )]
     private ?string $sexe = null;
 
     #[ORM\Column]
     #[Groups(["produit:read"])]
+    #[OA\Property(
+        description: 'Date et heure de création du produit',
+        type: 'string',
+        format: 'date-time',
+        example: '2025-01-22T10:30:00+00:00'
+    )]
     private ?\DateTimeImmutable $createdAt = null;
 
     #[ORM\Column]
     #[Groups(["produit:read"])]
+    #[OA\Property(
+        description: 'Date et heure de dernière modification du produit',
+        type: 'string',
+        format: 'date-time',
+        example: '2025-01-22T14:45:00+00:00'
+    )]
     private ?\DateTimeImmutable $updatedAt = null;
 
     public function __construct()
@@ -233,6 +314,11 @@ class Produit
     /**
      * Méthode utilitaire pour obtenir le prix formaté
      */
+    #[OA\Property(
+        description: 'Prix formaté avec devise (lecture seule)',
+        type: 'string',
+        example: '29,99 €'
+    )]
     public function getPrixFormate(): string
     {
         return number_format($this->prix, 2, ',', ' ') . ' €';
@@ -241,6 +327,11 @@ class Produit
     /**
      * Vérifie si le produit est en stock (exemple pour extension future)
      */
+    #[OA\Property(
+        description: 'Statut de disponibilité du produit (lecture seule)',
+        type: 'boolean',
+        example: true
+    )]
     public function estDisponible(): bool
     {
         // Logique à implémenter selon vos besoins
