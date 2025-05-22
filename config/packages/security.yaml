@@ -33,21 +33,26 @@ security:
             lazy: true
             provider: app_user_provider
 
-    # Access control
+    # Access control - CATALOGUE PUBLIC
     access_control:
-        # Routes publiques
+        # Routes publiques - Authentification
         - { path: ^/api/login, roles: PUBLIC_ACCESS }
         - { path: ^/api/register, roles: PUBLIC_ACCESS }
         - { path: ^/api/doc, roles: PUBLIC_ACCESS }
         
-        # Lecture des produits - utilisateurs connectés
-        - { path: ^/api/produits$, roles: ROLE_USER, methods: [GET] }
-        - { path: ^/api/produits/\d+$, roles: ROLE_USER, methods: [GET] }
-        - { path: ^/api/produits/categorie, roles: ROLE_USER, methods: [GET] }
-        - { path: ^/api/produits/search, roles: ROLE_USER, methods: [GET] }
+        # CATALOGUE PUBLIC - Lecture libre pour tous
+        - { path: ^/api/produits$, roles: PUBLIC_ACCESS, methods: [GET] }
+        - { path: ^/api/produits/\d+$, roles: PUBLIC_ACCESS, methods: [GET] }
+        - { path: ^/api/produits/categorie, roles: PUBLIC_ACCESS, methods: [GET] }
+        - { path: ^/api/produits/search, roles: PUBLIC_ACCESS, methods: [GET] }
+        - { path: ^/api/produits/stats, roles: PUBLIC_ACCESS, methods: [GET] }
         
-        # Modification des produits - admins seulement
+        # GESTION PRODUITS - Admins seulement
         - { path: ^/api/produits, roles: ROLE_ADMIN, methods: [POST, PUT, DELETE] }
+        
+        # ROUTES UTILISATEUR - Connectés seulement
+        - { path: ^/api/me, roles: ROLE_USER }
+        - { path: ^/api/test-auth, roles: ROLE_USER }
         
         # Toutes les autres routes API nécessitent une authentification
         - { path: ^/api, roles: ROLE_USER }

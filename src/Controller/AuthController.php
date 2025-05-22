@@ -3,10 +3,7 @@
 namespace App\Controller;
 
 use App\Entity\User;
-use App\Repository\UserRepository;
 use Doctrine\ORM\EntityManagerInterface;
-use Firebase\JWT\JWT;
-use Firebase\JWT\Key;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
@@ -14,12 +11,62 @@ use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 use Symfony\Component\Routing\Annotation\Route;
 use Symfony\Component\Validator\Validator\ValidatorInterface;
+use OpenApi\Attributes as OA;
 
 class AuthController extends AbstractController
 {
-    private string $jwtSecret = 'your-super-secret-jwt-key-change-this-in-production';
-
     #[Route('/api/register', name: 'api_register', methods: ['POST'])]
+    #[OA\Post(
+        path: '/api/register',
+        summary: 'Inscription d\'un nouvel utilisateur',
+        tags: ['Authentification']
+    )]
+    #[OA\RequestBody(
+        required: true,
+        content: new OA\JsonContent(
+            type: 'object',
+            required: ['email', 'password', 'nom'],
+            properties: [
+                new OA\Property(property: 'email', type: 'string', format: 'email', example: 'admin@example.com'),
+                new OA\Property(property: 'password', type: 'string', minLength: 6, example: 'motdepasse123'),
+                new OA\Property(property: 'nom', type: 'string', minLength: 2, example: 'Admin Exeet'),
+                new OA\Property(property: 'roles', type: 'array', items: new OA\Items(type: 'string'), example: ['ROLE_ADMIN'])
+            ]
+        )
+    )]
+    #[OA\Response(
+        response: 201,
+        description: 'Utilisateur créé avec succès',
+        content: new OA\JsonContent(
+            type: 'object',
+            properties: [
+                new OA\Property(property: 'success', type: 'boolean', example: true),
+                new OA\Property(property: 'message', type: 'string', example: 'Utilisateur créé avec succès'),
+                new OA\Property(
+                    property: 'user',
+                    type: 'object',
+                    properties: [
+                        new OA\Property(property: 'id', type: 'integer', example: 1),
+                        new OA\Property(property: 'email', type: 'string', example: 'admin@example.com'),
+                        new OA\Property(property: 'nom', type: 'string', example: 'Admin Exeet'),
+                        new OA\Property(property: 'roles', type: 'array', items: new OA\Items(type: 'string'))
+                    ]
+                )
+            ]
+        )
+    )]
+    #[OA\Response(
+        response: 400,
+        description: 'Erreur de validation',
+        content: new OA\JsonContent(
+            type: 'object',
+            properties: [
+                new OA\Property(property: 'success', type: 'boolean', example: false),
+                new OA\Property(property: 'message', type: 'string', example: 'Erreurs de validation'),
+                new OA\Property(property: 'errors', type: 'object')
+            ]
+        )
+    )]
     public function register(
         Request $request,
         UserPasswordHasherInterface $passwordHasher,
@@ -62,7 +109,7 @@ class AuthController extends AbstractController
             // Définir les rôles
             $roles = ['ROLE_USER']; // Rôle par défaut
             if (isset($data['roles']) && is_array($data['roles'])) {
-                $roles = $data['roles'];
+                $roles = array_unique(array_merge($roles, $data['roles']));
             }
             $user->setRoles($roles);
 
@@ -117,178 +164,156 @@ class AuthController extends AbstractController
     }
 
     #[Route('/api/login', name: 'api_login', methods: ['POST'])]
-    public function login(
-        Request $request,
-        UserRepository $userRepository,
-        UserPasswordHasherInterface $passwordHasher
-    ): JsonResponse {
-        try {
-            // Récupérer les données JSON
-            $data = json_decode($request->getContent(), true);
-
-            if (!$data || empty($data['email']) || empty($data['password'])) {
-                return $this->json([
-                    'success' => false,
-                    'message' => 'Email et mot de passe requis'
-                ], Response::HTTP_BAD_REQUEST);
-            }
-
-            // Trouver l'utilisateur
-            $user = $userRepository->findOneByEmail($data['email']);
-            if (!$user) {
-                return $this->json([
-                    'success' => false,
-                    'message' => 'Identifiants invalides'
-                ], Response::HTTP_UNAUTHORIZED);
-            }
-
-            // Vérifier le mot de passe
-            if (!$passwordHasher->isPasswordValid($user, $data['password'])) {
-                return $this->json([
-                    'success' => false,
-                    'message' => 'Identifiants invalides'
-                ], Response::HTTP_UNAUTHORIZED);
-            }
-
-            // Générer le token JWT
-            $payload = [
-                'user_id' => $user->getId(),
-                'email' => $user->getEmail(),
-                'roles' => $user->getRoles(),
-                'iat' => time(), // Issued at
-                'exp' => time() + (60 * 60) // Expire dans 1 heure
-            ];
-
-            $token = JWT::encode($payload, $this->jwtSecret, 'HS256');
-
-            return $this->json([
-                'success' => true,
-                'message' => 'Connexion réussie',
-                'token' => $token,
-                'user' => [
-                    'id' => $user->getId(),
-                    'email' => $user->getEmail(),
-                    'nom' => $user->getNom(),
-                    'roles' => $user->getRoles()
-                ]
-            ]);
-
-        } catch (\Exception $e) {
-            return $this->json([
-                'success' => false,
-                'message' => 'Erreur lors de la connexion',
-                'error' => $e->getMessage()
-            ], Response::HTTP_INTERNAL_SERVER_ERROR);
-        }
+    #[OA\Post(
+        path: '/api/login',
+        summary: 'Point d\'entrée pour la connexion',
+        description: 'Redirige vers /api/login_check pour la connexion JWT',
+        tags: ['Authentification']
+    )]
+    #[OA\RequestBody(
+        required: true,
+        content: new OA\JsonContent(
+            type: 'object',
+            required: ['username', 'password'],
+            properties: [
+                new OA\Property(property: 'username', type: 'string', format: 'email', example: 'admin@example.com'),
+                new OA\Property(property: 'password', type: 'string', example: 'motdepasse123')
+            ]
+        )
+    )]
+    #[OA\Response(
+        response: 200,
+        description: 'Information sur l\'endpoint de connexion',
+        content: new OA\JsonContent(
+            type: 'object',
+            properties: [
+                new OA\Property(property: 'message', type: 'string', example: 'Utilisez POST /api/login_check'),
+                new OA\Property(property: 'format', type: 'object', properties: [
+                    new OA\Property(property: 'username', type: 'string', example: 'votre-email@exemple.com'),
+                    new OA\Property(property: 'password', type: 'string', example: 'votre-mot-de-passe')
+                ])
+            ]
+        )
+    )]
+    public function login(): JsonResponse
+    {
+        // Cette méthode ne sera jamais appelée car Symfony intercepte la route
+        // La vraie logique de connexion est gérée par le firewall JWT
+        return $this->json([
+            'message' => 'Utilisez POST /api/login_check pour vous connecter',
+            'format' => [
+                'username' => 'votre-email@exemple.com',
+                'password' => 'votre-mot-de-passe'
+            ],
+            'note' => 'Cette route est gérée automatiquement par Lexik JWT'
+        ]);
     }
 
     #[Route('/api/me', name: 'api_me', methods: ['GET'])]
-    public function me(Request $request, UserRepository $userRepository): JsonResponse
+    #[OA\Get(
+        path: '/api/me',
+        summary: 'Récupère les informations de l\'utilisateur connecté',
+        tags: ['Authentification'],
+        security: [['Bearer' => []]]
+    )]
+    #[OA\Response(
+        response: 200,
+        description: 'Informations utilisateur',
+        content: new OA\JsonContent(
+            type: 'object',
+            properties: [
+                new OA\Property(property: 'success', type: 'boolean', example: true),
+                new OA\Property(
+                    property: 'user',
+                    type: 'object',
+                    properties: [
+                        new OA\Property(property: 'id', type: 'integer', example: 1),
+                        new OA\Property(property: 'email', type: 'string', example: 'admin@example.com'),
+                        new OA\Property(property: 'nom', type: 'string', example: 'Admin Exeet'),
+                        new OA\Property(property: 'roles', type: 'array', items: new OA\Items(type: 'string'))
+                    ]
+                )
+            ]
+        )
+    )]
+    #[OA\Response(
+        response: 401,
+        description: 'Token manquant ou invalide',
+        content: new OA\JsonContent(
+            type: 'object',
+            properties: [
+                new OA\Property(property: 'success', type: 'boolean', example: false),
+                new OA\Property(property: 'message', type: 'string', example: 'JWT Token not found')
+            ]
+        )
+    )]
+    public function me(): JsonResponse
     {
-        try {
-            // Récupérer le token depuis les headers
-            $authHeader = $request->headers->get('Authorization');
-            if (!$authHeader || !str_starts_with($authHeader, 'Bearer ')) {
-                return $this->json([
-                    'success' => false,
-                    'message' => 'Token manquant'
-                ], Response::HTTP_UNAUTHORIZED);
-            }
+        // Récupérer l'utilisateur connecté via le token JWT
+        $user = $this->getUser();
 
-            $token = substr($authHeader, 7); // Enlever "Bearer "
-
-            // Décoder le token
-            try {
-                $decoded = JWT::decode($token, new Key($this->jwtSecret, 'HS256'));
-                $payload = (array) $decoded;
-            } catch (\Exception $e) {
-                return $this->json([
-                    'success' => false,
-                    'message' => 'Token invalide'
-                ], Response::HTTP_UNAUTHORIZED);
-            }
-
-            // Vérifier l'expiration
-            if (isset($payload['exp']) && $payload['exp'] < time()) {
-                return $this->json([
-                    'success' => false,
-                    'message' => 'Token expiré'
-                ], Response::HTTP_UNAUTHORIZED);
-            }
-
-            // Récupérer l'utilisateur
-            $user = $userRepository->find($payload['user_id']);
-            if (!$user) {
-                return $this->json([
-                    'success' => false,
-                    'message' => 'Utilisateur non trouvé'
-                ], Response::HTTP_UNAUTHORIZED);
-            }
-
-            return $this->json([
-                'success' => true,
-                'user' => [
-                    'id' => $user->getId(),
-                    'email' => $user->getEmail(),
-                    'nom' => $user->getNom(),
-                    'roles' => $user->getRoles()
-                ]
-            ]);
-
-        } catch (\Exception $e) {
+        if (!$user) {
             return $this->json([
                 'success' => false,
-                'message' => 'Erreur lors de la vérification du token',
-                'error' => $e->getMessage()
-            ], Response::HTTP_INTERNAL_SERVER_ERROR);
+                'message' => 'Utilisateur non authentifié'
+            ], Response::HTTP_UNAUTHORIZED);
         }
+
+        return $this->json([
+            'success' => true,
+            'user' => [
+                'id' => $user->getId(),
+                'email' => $user->getEmail(),
+                'nom' => $user->getNom(),
+                'roles' => $user->getRoles(),
+                'created_at' => $user->getCreatedAt()?->format('Y-m-d H:i:s')
+            ]
+        ]);
     }
 
     #[Route('/api/test-auth', name: 'api_test_auth', methods: ['GET'])]
-    public function testAuth(Request $request): JsonResponse
+    #[OA\Get(
+        path: '/api/test-auth',
+        summary: 'Test de l\'authentification JWT',
+        description: 'Route de test pour vérifier si l\'authentification JWT fonctionne',
+        tags: ['Authentification', 'Tests']
+    )]
+    #[OA\Response(
+        response: 200,
+        description: 'Test d\'authentification',
+        content: new OA\JsonContent(
+            type: 'object',
+            properties: [
+                new OA\Property(property: 'success', type: 'boolean'),
+                new OA\Property(property: 'message', type: 'string'),
+                new OA\Property(property: 'authenticated', type: 'boolean'),
+                new OA\Property(property: 'user', type: 'object', nullable: true)
+            ]
+        )
+    )]
+    public function testAuth(): JsonResponse
     {
-        // Route de test pour vérifier l'authentification
-        $authHeader = $request->headers->get('Authorization');
+        $user = $this->getUser();
         
-        if (!$authHeader) {
-            return $this->json([
-                'success' => false,
-                'message' => 'Pas d\'authentification - accès libre pour le moment',
-                'status' => 'NO_AUTH'
-            ]);
-        }
-
-        if (!str_starts_with($authHeader, 'Bearer ')) {
-            return $this->json([
-                'success' => false,
-                'message' => 'Format Bearer token requis',
-                'status' => 'INVALID_FORMAT'
-            ]);
-        }
-
-        $token = substr($authHeader, 7);
-
-        try {
-            $decoded = JWT::decode($token, new Key($this->jwtSecret, 'HS256'));
-            $payload = (array) $decoded;
-
+        if ($user) {
             return $this->json([
                 'success' => true,
-                'message' => 'Token valide !',
-                'user_data' => [
-                    'user_id' => $payload['user_id'] ?? null,
-                    'email' => $payload['email'] ?? null,
-                    'roles' => $payload['roles'] ?? null,
-                    'expires_at' => date('Y-m-d H:i:s', $payload['exp'] ?? 0)
+                'message' => 'Authentification réussie !',
+                'authenticated' => true,
+                'user' => [
+                    'id' => $user->getId(),
+                    'email' => $user->getEmail(),
+                    'roles' => $user->getRoles()
                 ]
             ]);
-
-        } catch (\Exception $e) {
+        } else {
             return $this->json([
                 'success' => false,
-                'message' => 'Token invalide',
-                'error' => $e->getMessage()
-            ], Response::HTTP_UNAUTHORIZED);
+                'message' => 'Pas d\'authentification détectée',
+                'authenticated' => false,
+                'user' => null,
+                'note' => 'Ajoutez un header Authorization: Bearer [votre-token]'
+            ]);
         }
     }
 }
