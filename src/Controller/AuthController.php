@@ -288,7 +288,7 @@ class AuthController extends AbstractController
         path: '/api/test-auth',
         summary: 'Test de l\'authentification JWT',
         description: 'Route de test pour vérifier si l\'authentification JWT fonctionne correctement. Utile pour debugger les problèmes de token.',
-        tags: ['Authentification', 'Tests'],
+        tags: ['Authentification'], // ← Supprimé "Tests"
         security: [['Bearer' => []]]
     )]
     #[OA\Response(
