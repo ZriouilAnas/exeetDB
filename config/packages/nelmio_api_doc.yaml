@@ -1,9 +1,50 @@
 nelmio_api_doc:
     documentation:
         info:
-            title: My App
-            description: This is an awesome app!
+            title: API Produits Exeet
+            description: |
+                API REST complète pour la gestion des produits avec authentification JWT.
+                
+                ## 🔐 Authentification
+                Cette API utilise JWT (JSON Web Tokens) pour l'authentification.
+                
+                ### Comment s'authentifier :
+                1. **Créer un compte** : `POST /api/register`
+                2. **Se connecter** : `POST /api/login_check` 
+                3. **Utiliser le token** : Ajouter `Authorization: Bearer {token}` dans les headers
+                
+                ### Permissions :
+                - **📖 Lecture produits** : Libre accès (pas de token requis)
+                - **✏️ Modification produits** : Admins seulement (ROLE_ADMIN)
+                - **👤 Informations utilisateur** : Utilisateurs connectés (ROLE_USER)
             version: 1.0.0
-    areas: # to filter documented areas
+            contact:
+                name: Équipe Exeet
+                email: contact@exeet.com
+        servers:
+            - url: http://localhost:8000
+              description: Serveur de développement
+            - url: https://api.exeet.com
+              description: Serveur de production
+        components:
+            securitySchemes:
+                Bearer:
+                    type: http
+                    scheme: bearer
+                    bearerFormat: JWT
+                    description: |
+                        Token JWT obtenu via /api/login_check
+                        
+                        **Format** : `Bearer {votre-token-jwt}`
+                        
+                        **Exemple** : `Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiJ9...`
+        security:
+            - Bearer: []
+    areas:
         path_patterns:
-            - ^/api(?!/doc$) # Accepts routes under /api except /api/doc
+            - ^/api(?!/doc$)
+        host_patterns: []
+    models:
+        names:
+            - { alias: Produit, type: App\Entity\Produit, groups: [produit:read] }
+            - { alias: User, type: App\Entity\User, groups: [user:read] }

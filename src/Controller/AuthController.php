@@ -13,24 +13,52 @@ use Symfony\Component\Routing\Annotation\Route;
 use Symfony\Component\Validator\Validator\ValidatorInterface;
 use OpenApi\Attributes as OA;
 
+#[OA\Tag(name: 'Authentification', description: 'Gestion des utilisateurs et authentification JWT')]
 class AuthController extends AbstractController
 {
     #[Route('/api/register', name: 'api_register', methods: ['POST'])]
     #[OA\Post(
         path: '/api/register',
         summary: 'Inscription d\'un nouvel utilisateur',
+        description: 'Crée un nouveau compte utilisateur avec validation complète. Les rôles disponibles sont ROLE_USER (par défaut) et ROLE_ADMIN.',
         tags: ['Authentification']
     )]
     #[OA\RequestBody(
+        description: 'Données de l\'utilisateur à créer',
         required: true,
         content: new OA\JsonContent(
             type: 'object',
             required: ['email', 'password', 'nom'],
             properties: [
-                new OA\Property(property: 'email', type: 'string', format: 'email', example: 'admin@example.com'),
-                new OA\Property(property: 'password', type: 'string', minLength: 6, example: 'motdepasse123'),
-                new OA\Property(property: 'nom', type: 'string', minLength: 2, example: 'Admin Exeet'),
-                new OA\Property(property: 'roles', type: 'array', items: new OA\Items(type: 'string'), example: ['ROLE_ADMIN'])
+                new OA\Property(
+                    property: 'email', 
+                    type: 'string', 
+                    format: 'email', 
+                    description: 'Adresse email unique de l\'utilisateur',
+                    example: 'admin@exeet.com'
+                ),
+                new OA\Property(
+                    property: 'password', 
+                    type: 'string', 
+                    minLength: 6, 
+                    description: 'Mot de passe (minimum 6 caractères)',
+                    example: 'motdepasse123'
+                ),
+                new OA\Property(
+                    property: 'nom', 
+                    type: 'string', 
+                    minLength: 2,
+                    maxLength: 100,
+                    description: 'Nom complet de l\'utilisateur',
+                    example: 'Admin Exeet'
+                ),
+                new OA\Property(
+                    property: 'roles', 
+                    type: 'array', 
+                    items: new OA\Items(type: 'string', enum: ['ROLE_USER', 'ROLE_ADMIN']),
+                    description: 'Rôles de l\'utilisateur (optionnel, ROLE_USER par défaut)',
+                    example: ['ROLE_ADMIN']
+                )
             ]
         )
     )]
@@ -47,9 +75,14 @@ class AuthController extends AbstractController
                     type: 'object',
                     properties: [
                         new OA\Property(property: 'id', type: 'integer', example: 1),
-                        new OA\Property(property: 'email', type: 'string', example: 'admin@example.com'),
+                        new OA\Property(property: 'email', type: 'string', example: 'admin@exeet.com'),
                         new OA\Property(property: 'nom', type: 'string', example: 'Admin Exeet'),
-                        new OA\Property(property: 'roles', type: 'array', items: new OA\Items(type: 'string'))
+                        new OA\Property(
+                            property: 'roles', 
+                            type: 'array', 
+                            items: new OA\Items(type: 'string'),
+                            example: ['ROLE_USER', 'ROLE_ADMIN']
+                        )
                     ]
                 )
             ]
@@ -57,13 +90,31 @@ class AuthController extends AbstractController
     )]
     #[OA\Response(
         response: 400,
-        description: 'Erreur de validation',
+        description: 'Erreur de validation des données',
         content: new OA\JsonContent(
             type: 'object',
             properties: [
                 new OA\Property(property: 'success', type: 'boolean', example: false),
                 new OA\Property(property: 'message', type: 'string', example: 'Erreurs de validation'),
-                new OA\Property(property: 'errors', type: 'object')
+                new OA\Property(
+                    property: 'errors', 
+                    type: 'object',
+                    example: [
+                        'email' => 'L\'email n\'est pas valide',
+                        'password' => 'Le mot de passe doit contenir au moins 6 caractères'
+                    ]
+                )
+            ]
+        )
+    )]
+    #[OA\Response(
+        response: 409,
+        description: 'Utilisateur déjà existant',
+        content: new OA\JsonContent(
+            type: 'object',
+            properties: [
+                new OA\Property(property: 'success', type: 'boolean', example: false),
+                new OA\Property(property: 'message', type: 'string', example: 'Un utilisateur avec cet email existe déjà')
             ]
         )
     )]
@@ -163,62 +214,17 @@ class AuthController extends AbstractController
         }
     }
 
-    #[Route('/api/login', name: 'api_login', methods: ['POST'])]
-    #[OA\Post(
-        path: '/api/login',
-        summary: 'Point d\'entrée pour la connexion',
-        description: 'Redirige vers /api/login_check pour la connexion JWT',
-        tags: ['Authentification']
-    )]
-    #[OA\RequestBody(
-        required: true,
-        content: new OA\JsonContent(
-            type: 'object',
-            required: ['username', 'password'],
-            properties: [
-                new OA\Property(property: 'username', type: 'string', format: 'email', example: 'admin@example.com'),
-                new OA\Property(property: 'password', type: 'string', example: 'motdepasse123')
-            ]
-        )
-    )]
-    #[OA\Response(
-        response: 200,
-        description: 'Information sur l\'endpoint de connexion',
-        content: new OA\JsonContent(
-            type: 'object',
-            properties: [
-                new OA\Property(property: 'message', type: 'string', example: 'Utilisez POST /api/login_check'),
-                new OA\Property(property: 'format', type: 'object', properties: [
-                    new OA\Property(property: 'username', type: 'string', example: 'votre-email@exemple.com'),
-                    new OA\Property(property: 'password', type: 'string', example: 'votre-mot-de-passe')
-                ])
-            ]
-        )
-    )]
-    public function login(): JsonResponse
-    {
-        // Cette méthode ne sera jamais appelée car Symfony intercepte la route
-        // La vraie logique de connexion est gérée par le firewall JWT
-        return $this->json([
-            'message' => 'Utilisez POST /api/login_check pour vous connecter',
-            'format' => [
-                'username' => 'votre-email@exemple.com',
-                'password' => 'votre-mot-de-passe'
-            ],
-            'note' => 'Cette route est gérée automatiquement par Lexik JWT'
-        ]);
-    }
-
     #[Route('/api/me', name: 'api_me', methods: ['GET'])]
     #[OA\Get(
         path: '/api/me',
         summary: 'Récupère les informations de l\'utilisateur connecté',
+        description: 'Retourne les informations détaillées de l\'utilisateur authentifié via le token JWT.',
         tags: ['Authentification'],
         security: [['Bearer' => []]]
     )]
     #[OA\Response(
         response: 200,
-        description: 'Informations utilisateur',
+        description: 'Informations utilisateur récupérées avec succès',
         content: new OA\JsonContent(
             type: 'object',
             properties: [
@@ -228,9 +234,15 @@ class AuthController extends AbstractController
                     type: 'object',
                     properties: [
                         new OA\Property(property: 'id', type: 'integer', example: 1),
-                        new OA\Property(property: 'email', type: 'string', example: 'admin@example.com'),
+                        new OA\Property(property: 'email', type: 'string', example: 'admin@exeet.com'),
                         new OA\Property(property: 'nom', type: 'string', example: 'Admin Exeet'),
-                        new OA\Property(property: 'roles', type: 'array', items: new OA\Items(type: 'string'))
+                        new OA\Property(
+                            property: 'roles', 
+                            type: 'array', 
+                            items: new OA\Items(type: 'string'),
+                            example: ['ROLE_USER', 'ROLE_ADMIN']
+                        ),
+                        new OA\Property(property: 'created_at', type: 'string', format: 'date-time', example: '2025-01-22 10:30:00')
                     ]
                 )
             ]
@@ -238,7 +250,7 @@ class AuthController extends AbstractController
     )]
     #[OA\Response(
         response: 401,
-        description: 'Token manquant ou invalide',
+        description: 'Token manquant, invalide ou expiré',
         content: new OA\JsonContent(
             type: 'object',
             properties: [
@@ -275,19 +287,47 @@ class AuthController extends AbstractController
     #[OA\Get(
         path: '/api/test-auth',
         summary: 'Test de l\'authentification JWT',
-        description: 'Route de test pour vérifier si l\'authentification JWT fonctionne',
-        tags: ['Authentification', 'Tests']
+        description: 'Route de test pour vérifier si l\'authentification JWT fonctionne correctement. Utile pour debugger les problèmes de token.',
+        tags: ['Authentification', 'Tests'],
+        security: [['Bearer' => []]]
     )]
     #[OA\Response(
         response: 200,
-        description: 'Test d\'authentification',
+        description: 'Test d\'authentification réussi',
         content: new OA\JsonContent(
             type: 'object',
             properties: [
-                new OA\Property(property: 'success', type: 'boolean'),
-                new OA\Property(property: 'message', type: 'string'),
-                new OA\Property(property: 'authenticated', type: 'boolean'),
-                new OA\Property(property: 'user', type: 'object', nullable: true)
+                new OA\Property(property: 'success', type: 'boolean', example: true),
+                new OA\Property(property: 'message', type: 'string', example: 'Authentification réussie !'),
+                new OA\Property(property: 'authenticated', type: 'boolean', example: true),
+                new OA\Property(
+                    property: 'user',
+                    type: 'object',
+                    properties: [
+                        new OA\Property(property: 'id', type: 'integer', example: 1),
+                        new OA\Property(property: 'email', type: 'string', example: 'admin@exeet.com'),
+                        new OA\Property(
+                            property: 'roles', 
+                            type: 'array', 
+                            items: new OA\Items(type: 'string'),
+                            example: ['ROLE_USER', 'ROLE_ADMIN']
+                        )
+                    ]
+                )
+            ]
+        )
+    )]
+    #[OA\Response(
+        response: 401,
+        description: 'Pas d\'authentification détectée',
+        content: new OA\JsonContent(
+            type: 'object',
+            properties: [
+                new OA\Property(property: 'success', type: 'boolean', example: false),
+                new OA\Property(property: 'message', type: 'string', example: 'Pas d\'authentification détectée'),
+                new OA\Property(property: 'authenticated', type: 'boolean', example: false),
+                new OA\Property(property: 'user', type: 'null', example: null),
+                new OA\Property(property: 'note', type: 'string', example: 'Ajoutez un header Authorization: Bearer [votre-token]')
             ]
         )
     )]
@@ -313,7 +353,7 @@ class AuthController extends AbstractController
                 'authenticated' => false,
                 'user' => null,
                 'note' => 'Ajoutez un header Authorization: Bearer [votre-token]'
-            ]);
+            ], Response::HTTP_UNAUTHORIZED);
         }
     }
 }
